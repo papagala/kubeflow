@@ -178,6 +178,9 @@ jobs:
     - name: Create Test Notebook
       run: |
         sed "s/kubeflow-user-example-com/$KF_PROFILE/g" tests/notebook.test.kubeflow-user-example.com.yaml | kubectl apply -f -
+        # kubectl wait errors immediately ("no matching resources found") if the notebook-controller
+        # hasn't created the pod yet, so first wait for the pod to appear, then wait for Ready.
+        timeout 120 bash -c "until kubectl get pod -l app=test -n $KF_PROFILE 2>/dev/null | grep -q '^test-'; do sleep 5; done"
         kubectl wait --for=condition=Ready pod -l app=test -n $KF_PROFILE --timeout=600s
 
     - name: Copy and execute the pipeline run script in KF Notebook
