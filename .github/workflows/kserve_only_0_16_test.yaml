@@ -66,6 +66,13 @@ jobs:
     - name: Install Knative
       run: ./tests/knative_install.sh
 
+    # Workaround for a KServe v0.16.0 packaging gap: kserve_kubeflow.yaml ships 8
+    # LLMInferenceServiceConfig CRs hardcoded to `namespace: kserve`, but the Kubeflow
+    # flow installs KServe into `kubeflow` and never creates a `kserve` namespace, so the
+    # apply fails with `namespaces "kserve" not found`. Creating the namespace unblocks it.
+    - name: Create kserve namespace (v0.16.0 LLMInferenceServiceConfig workaround)
+      run: kubectl create namespace kserve --dry-run=client -o yaml | kubectl apply -f -
+
     - name: Install KServe
       run: ./tests/kserve_install.sh
 
