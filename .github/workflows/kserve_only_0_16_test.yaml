@@ -1,0 +1,90 @@
+name: KServe-only Test (v0.16.0 compat)
+
+# Trimmed fork of full_kubeflow_integration_test.yaml.
+# Purpose: run ONLY the KServe integration test (kserve_test.sh, line 200 of the
+# original workflow) against KServe v0.16.0 on a free ubuntu-latest runner, to check
+# compatibility with the Kubeflow v1.11.0 platform (which shipped KServe v0.15.x).
+#
+# Differences vs the original:
+#   - runs-on: ubuntu-latest (free) instead of the oracle-vm-16cpu-64gb self-hosted runner
+#   - removed the `if: github.repository == 'kubeflow/manifests'` guard so it runs on the fork
+#   - installs ONLY the platform components kserve_test.sh depends on
+#   - runs only the "Run KServe Test" step; everything after it is dropped
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - test/kserve-0.16.0
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  KF_PROFILE: kubeflow-user-example-com
+
+jobs:
+  kserve-integration:
+    name: KServe 0.16.0 Installation and Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Free up disk space
+      run: ./tests/free-disk-space.sh
+
+    - name: Install KinD, Create KinD cluster and Install kustomize
+      run: ./tests/install_KinD_create_KinD_cluster_install_kustomize.sh
+
+    - name: Install kubectl
+      run: ./tests/kubectl_install.sh
+
+    - name: Create Kubeflow Namespace
+      run: kustomize build common/kubeflow-namespace/base | kubectl apply -f -
+
+    - name: Install Certificate Manager
+      run: ./tests/cert_manager_install.sh
+
+    - name: Install Istio CNI
+      run: ./tests/istio-cni_install.sh
+
+    - name: Install OAuth2 Proxy
+      run: ./tests/oauth2-proxy_install.sh
+
+    - name: Install Kubeflow Istio Resources
+      run: kustomize build common/istio/kubeflow-istio-resources/base | kubectl apply -f -
+
+    - name: Install Multi-Tenancy
+      run: ./tests/multi_tenancy_install.sh
+
+    - name: Install Dex
+      run: ./tests/dex_install.sh
+
+    - name: Install Knative
+      run: ./tests/knative_install.sh
+
+    - name: Install KServe
+      run: ./tests/kserve_install.sh
+
+    - name: Create KF Profile
+      run: ./tests/kubeflow_profile_install.sh
+
+    - name: Run KServe Test
+      run: ./tests/kserve_test.sh ${KF_PROFILE}
+
+    - name: Diagnostics on failure
+      if: failure()
+      run: |
+        echo "===== pods (all namespaces) ====="
+        kubectl get pods -A -o wide || true
+        echo "===== events (kserve profile ns) ====="
+        kubectl get events -n ${KF_PROFILE} --sort-by=.lastTimestamp || true
+        echo "===== kserve controller logs ====="
+        kubectl logs -n kubeflow deployment/kserve-controller-manager --tail=200 || true
+        echo "===== inferenceservices ====="
+        kubectl get inferenceservice -A -o wide || true
+        echo "===== ksvc ====="
+        kubectl get ksvc -A -o wide || true
