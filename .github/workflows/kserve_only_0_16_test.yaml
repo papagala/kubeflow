@@ -91,6 +91,12 @@ jobs:
         kubectl get events -n ${KF_PROFILE} --sort-by=.lastTimestamp || true
         echo "===== kserve controller logs ====="
         kubectl logs -n kubeflow deployment/kserve-controller-manager --tail=200 || true
+        echo "===== llmisvc controller state + logs ====="
+        kubectl get deploy,po -n kubeflow -l app.kubernetes.io/name=llmisvc-controller-manager -o wide || true
+        kubectl describe deployment/llmisvc-controller-manager -n kubeflow || true
+        kubectl logs -n kubeflow deployment/llmisvc-controller-manager --tail=200 || true
+        echo "===== certificates ====="
+        kubectl get certificate -n kubeflow || true
         echo "===== inferenceservices ====="
         kubectl get inferenceservice -A -o wide || true
         echo "===== ksvc ====="
