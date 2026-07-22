@@ -47,12 +47,14 @@ kubeadmConfigPatches:
       extraArgs:
         \"service-account-issuer\": \"https://kubernetes.default.svc\"
         \"service-account-signing-key-file\": \"/etc/kubernetes/pki/sa.key\"
+# Single-node cluster: on the free ubuntu-latest runner, cross-node pod networking
+# in the default 3-node KinD topology is unreliable (apiserver/pods cannot reach pods
+# scheduled on a second worker), which black-holes admission webhook calls with
+# failurePolicy=Fail (e.g. KServe 0.16.0's llminferenceserviceconfig validator).
+# KinD nodes are containers on the same VM, so one node uses the same total resources
+# minus overhead while removing cross-node traffic entirely.
 nodes:
 - role: control-plane
-  image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
-- role: worker
-  image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
-- role: worker
   image: kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a
 " | kind create cluster --config - --wait 120s
 
