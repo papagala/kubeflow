@@ -97,6 +97,16 @@ jobs:
         kubectl logs -n kubeflow deployment/llmisvc-controller-manager --tail=200 || true
         echo "===== certificates ====="
         kubectl get certificate -n kubeflow || true
+        echo "===== webhook service endpoints (A/B: kserve works, llmisvc times out) ====="
+        kubectl get endpoints -n kubeflow kserve-webhook-server-service llmisvc-webhook-server-service -o wide || true
+        kubectl get endpointslices -n kubeflow -o wide | grep -Ei 'NAME|kserve-webhook|llmisvc-webhook' || true
+        echo "===== llmisvc pod istio/annotations ====="
+        kubectl get pod -n kubeflow -l control-plane=llmisvc-controller-manager -o jsonpath='{range .items[*]}{.metadata.name}{"  containers="}{.spec.containers[*].name}{"  inject="}{.metadata.annotations.sidecar\.istio\.io/inject}{"\n"}{end}' || true
+        echo "===== in-cluster curl A/B (from a sidecar-free pod in default ns; timeout => unreachable) ====="
+        kubectl run whprobe --rm -i --restart=Never --image=curlimages/curl:8.10.1 --command -- sh -c '
+          echo "--- kserve ---";  curl -sk -m 8 -o /dev/null -w "http=%{http_code} time=%{time_total}\n" https://kserve-webhook-server-service.kubeflow.svc:443/validate-serving-kserve-io-v1alpha1-clusterservingruntime  || echo "kserve UNREACHABLE";
+          echo "--- llmisvc ---"; curl -sk -m 8 -o /dev/null -w "http=%{http_code} time=%{time_total}\n" https://llmisvc-webhook-server-service.kubeflow.svc:443/validate-serving-kserve-io-v1alpha1-llminferenceserviceconfig || echo "llmisvc UNREACHABLE";
+        ' || true
         echo "===== inferenceservices ====="
         kubectl get inferenceservice -A -o wide || true
         echo "===== ksvc ====="
