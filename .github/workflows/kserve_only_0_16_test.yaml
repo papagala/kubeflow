@@ -79,6 +79,12 @@ jobs:
     - name: Create KF Profile
       run: ./tests/kubeflow_profile_install.sh
 
+    # Exposes the istio ingress gateway at localhost:8080, which kserve_test.sh
+    # (and the sklearn pytest) target via KSERVE_INGRESS_HOST_PORT. Present in the
+    # original workflow; required before the KServe test.
+    - name: Port-forward the istio-ingress gateway
+      run: ./tests/port_forward_gateway.sh
+
     - name: Run KServe Test
       run: ./tests/kserve_test.sh ${KF_PROFILE}
 
