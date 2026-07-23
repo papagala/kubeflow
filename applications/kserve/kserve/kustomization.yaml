@@ -28,7 +28,7 @@ patches:
             seccompProfile:
               type: RuntimeDefault
 
-- patch: | 
+- patch: |
      apiVersion: apps/v1
      kind: Deployment
      metadata:
@@ -36,6 +36,29 @@ patches:
        namespace: kubeflow
      spec:
       template:
+        spec:
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+
+# KServe 0.16.0 ships the new llmisvc-controller-manager WITHOUT the
+# `sidecar.istio.io/inject: "false"` annotation that the other kserve controllers have.
+# Because the kubeflow namespace has istio-injection=enabled, Istio injects a sidecar
+# into the llmisvc webhook pod, which then intercepts inbound :9443 and expects mTLS.
+# The kube-apiserver's plain-TLS admission webhook call to the llminferenceserviceconfig
+# validator then hangs -> "context deadline exceeded", breaking `kubectl apply`.
+# Opt the llmisvc controller out of injection, matching kserve-controller-manager.
+- patch: |
+     apiVersion: apps/v1
+     kind: Deployment
+     metadata:
+       name: llmisvc-controller-manager
+       namespace: kubeflow
+     spec:
+      template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
         spec:
           securityContext:
             seccompProfile:
